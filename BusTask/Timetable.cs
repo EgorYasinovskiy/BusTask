@@ -17,7 +17,7 @@
 				var routeData = fileData[i + 4].Split(" ").Skip(1);
 				var stops = routeData.Take(routeData.Count() / 2).Select(x => int.Parse(x));
 				var times = routeData.Skip(routeData.Count() / 2).Select(x => int.Parse(x));
-				routes.Add(new Route(stops, times, startTimes[i], prices[i]));
+				routes.Add(new Route(stops, times, startTimes[i], prices[i],i));
 			}
 			
 			var timeTable = new Timetable();

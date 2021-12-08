@@ -4,7 +4,8 @@ namespace BusTask.UI
 {
 	public partial class Form1 : Form
 	{
-		Timetable timetable;
+		Timetable _timetable;
+		Graph _graph;
 		public Form1()
 		{
 			InitializeComponent();
@@ -17,7 +18,8 @@ namespace BusTask.UI
 			{
 				if (ofd.ShowDialog() == DialogResult.OK)
 				{
-					timetable = Timetable.Load(ofd.FileName);
+					_timetable = Timetable.Load(ofd.FileName);
+					_graph = new Graph(_timetable);
 					TurnControls(true);
 				}
 			}
@@ -35,13 +37,14 @@ namespace BusTask.UI
 			int start = int.Parse(tbStart.Text);
 			int end = int.Parse(tbEnd.Text);
 			TimeOnly time = TimeOnly.Parse(tbTime.Text);
-
-			Graph graph = new Graph(timetable);
-			var res = graph.Dijkstra(start,end,time, this.checkBox1.Checked);
+			var res = _graph.FindRoute(start, end, time, checkBox1.Checked);
 			if (res == null)
 				MessageBox.Show("Путь не найден");
 			else
-				MessageBox.Show(string.Join("\n", res.Select(x => $"{x.StopId},{x.ArrivalTime}").ToArray()));
+			{
+				var answer = string.Join('\n', res.Select(x => $"От остановки {x.From}(Маршрут {x.RouteFrom + 1}) до остановки{x.To}(Маршрут {x.RouteTo + 1})").ToArray());
+				MessageBox.Show(answer);
+			}
 		}
 	}
 }

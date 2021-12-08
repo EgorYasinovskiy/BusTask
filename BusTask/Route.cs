@@ -6,14 +6,16 @@
 		public List<int> TimeSpans { get; set; }
 		public TimeOnly StartTime { get; set; }
 		public int Price { get; set; }
+		public int Id { get; set; }
 		public List<BusStop> BusStops { get; set; } = new List<BusStop>();
 
-		public Route(IEnumerable<int> stops, IEnumerable<int> timespans, TimeOnly startTime, int price)
+		public Route(IEnumerable<int> stops, IEnumerable<int> timespans, TimeOnly startTime, int price, int id)
 		{
 			Stops = stops.ToList();
 			TimeSpans = timespans.ToList();
 			StartTime = startTime;
 			Price = price;
+			Id = id;
 			InitBusStops();
 		}
 
@@ -23,7 +25,7 @@
 			var counter = 0;
 			while(time >= StartTime)
 			{
-				BusStops.Add(new BusStop() { StopId = Stops[counter], ArrivalTime = time });
+				BusStops.Add(new BusStop(Stops[counter],Id) { ArrivalTime = time });
 				time = time.AddMinutes(TimeSpans[counter]);
 				counter++;
 				if (counter == Stops.Count)

@@ -2,124 +2,183 @@
 {
 	public class Graph
 	{
-		public BusStop[] BusStops { get; set; }
-		public Move[] Moves { get; set; }
-		private WeightComparer _weightComparer = new WeightComparer();
+		private readonly Timetable _timetable;
+		private readonly WeightComparer _weightComparer = new WeightComparer();
+		public List<Edge> Edges { get; set; }
+		public List<BusStop> Vertices { get; set; }
 		public Graph(Timetable timetable)
 		{
-			BusStops = timetable.Routes.SelectMany(x => x.BusStops).ToArray();
-			List<Move> moves = new List<Move>();
+			Vertices = new List<BusStop>();
+			Edges = new List<Edge>();
+
+			_timetable = timetable;
 			foreach (var route in timetable.Routes)
 			{
-				route.BusStops = route.BusStops.OrderBy(x => x.ArrivalTime).ToList();
-				for (int i = 0; i < route.BusStops.Count - 1; i++)
+				List<Edge> edges = new List<Edge>();
+				for (int i = 0; i < route.Stops.Count; i++)
 				{
-					for (int j = i+1; j < route.BusStops.Count; j++)
+					Vertices.Add(new BusStop(route.Stops[i], route.Id));
+
+					for (int j = 0; j < route.Stops.Count; j++)
 					{
-						moves.Add(new Move
+						if (i == j)
+							continue;
+
+						int time;
+						if (i < j)
+							time = route.TimeSpans.Skip(i).Take(j - i).Sum();
+						else
+							time = route.TimeSpans.Skip(i).Sum() + route.TimeSpans.Take(j).Sum();
+
+						edges.Add(new Edge()
 						{
-							From = route.BusStops[i],
-							To = route.BusStops[j],
-							Time = new Weight { Value = (int)(route.BusStops[j].ArrivalTime - route.BusStops[i].ArrivalTime).TotalMinutes },
-							Price = new Weight { Value = route.Price }
+							From = route.Stops[i],
+							To = route.Stops[j],
+							Time = new Weight() { Value = time },
+							Price = new Weight() { Value = route.Price },
+							RouteFrom = route.Id,
+							RouteTo = route.Id
 						});
 					}
-					// ребра пересадок
-					foreach (var transitRoute in timetable.Routes.Except(new[] { route }))
+
+				}
+
+				Edges.AddRange(edges);
+			}
+			// Добавляем ребра пересадок(значение Time указываем null), чтобы расчитать время передадки в зависимости от времени выезда
+			foreach (var stop in Vertices)
+			{
+				var transitStops = Vertices.Where(x => x.StopId == stop.StopId && x.Route != stop.Route);
+				foreach (var transitStop in transitStops)
+				{
+					Edges.Add(new Edge()
 					{
-						foreach (var transitStop in transitRoute.BusStops.Where(x => x.StopId == route.BusStops[i].StopId && x.ArrivalTime >= route.BusStops[i].ArrivalTime))
+						From = stop.StopId,
+						To = stop.StopId,
+						Time = new Weight() { Value = null },
+						Price = new Weight() { Value = 0 },
+						RouteFrom = stop.Route,
+						RouteTo = transitStop.Route
+					});
+				}
+			}
+		}
+		public Edge[] FindRoute(int from, int to, TimeOnly startTime, bool byPrice = false)
+		{
+			var allStops = _timetable.Routes.SelectMany(r => r.BusStops).Where(r => r.ArrivalTime >= startTime);
+			var startStop = allStops.Where(x => x.StopId == from).MinBy(x => x.ArrivalTime);
+			if (startStop == null)
+				return null;
+			var visited = new List<BusStop>() { startStop };
+			var pathEdges = GetPathInitValues(startStop).ToArray();
+
+			while (visited.Count != Vertices.Count)
+			{
+				var availableEdges = pathEdges.Where(x => !visited.Any(s => s.StopId == x.To && s.Route == x.RouteTo));
+				if (availableEdges.Count() == 0)
+					break;
+				Edge currentEdge;
+
+				currentEdge = byPrice ? availableEdges.MinBy(x => x.Price, _weightComparer) : availableEdges.MinBy(x => x.Time, _weightComparer);
+				if (currentEdge != null)
+				{
+					var currentTime = currentEdge.Time.Value.Value;
+
+					var relatedEdges = Edges.Where(x => x.From == currentEdge.To && x.RouteFrom == currentEdge.RouteTo);
+					foreach (var edge in relatedEdges)
+					{
+						var actualPath = pathEdges.FirstOrDefault(x => x.To == edge.To && x.RouteTo == edge.RouteTo) ;
+						Weight transitTime = new Weight() { Value = null };
+						if (edge.RouteTo != edge.RouteFrom)
 						{
-							moves.Add(new Move
+							// расчет времени пересадки
+							var nearestTransit = allStops.Where(x =>
+								x.Route == edge.RouteTo
+								&& x.StopId == edge.To
+								&& x.ArrivalTime >= startStop.ArrivalTime.AddMinutes(currentTime)).MinBy(x => x.ArrivalTime);
+							if (nearestTransit == null) // Нет точки пересадки по текущему времени
 							{
-								From = route.BusStops[i],
-								To = transitStop,
-								Time = new Weight { Value = (int)(transitStop.ArrivalTime - route.BusStops[i].ArrivalTime).TotalMinutes },
-								Price = new Weight { Value = 0 }
-							});
+								visited.Add(new BusStop(edge.To, edge.RouteTo));
+								continue;
+							}
+							else
+							{
+								transitTime = new Weight() { Value = (int)(nearestTransit.ArrivalTime - startStop.ArrivalTime.AddMinutes(currentTime)).TotalMinutes };
+								if(currentTime+transitTime.Value > 1440)
+								{
+									visited.Add(new BusStop(edge.To, edge.RouteTo));
+									continue;
+								}
+							}
+							edge.Time = transitTime;
+						}
+
+						if ((byPrice && (actualPath.Price > edge.Price + currentEdge.Price))
+						|| (!byPrice && (actualPath.Time > edge.Time + currentEdge.Time)))
+						{
+							actualPath.From = edge.From;
+							actualPath.Time = edge.Time + currentEdge.Time;
+							actualPath.Price = edge.Price + currentEdge.Price;
+							actualPath.RouteFrom = edge.RouteFrom;
 						}
 					}
+					visited.Add(new BusStop(currentEdge.To, currentEdge.RouteTo));
 				}
-			}
-			Moves = moves.ToArray();
-		}
 
-		public List<BusStop> Dijkstra(int startPoint, int endPoint, TimeOnly startTime, bool byPrice)
-		{
-			var actualBusStops = BusStops.Where(x => x.ArrivalTime >= startTime).ToArray();
-			var actualMoves = Moves.Where(x => x.From.ArrivalTime >= startTime);
-			var startBusStop = actualBusStops.FirstOrDefault(x => x.StopId == startPoint);
-			if (startBusStop == null)
-				return null;
-			var pathValues = new Move[actualBusStops.Length];
-			for (int i = 0; i < actualBusStops.Length; i++)
-			{
-				if (actualBusStops[i] == startBusStop)
-				{
-					pathValues[i] = new Move
-					{
-						From = startBusStop,
-						To = startBusStop,
-						Time = new Weight { Value = 0 },
-						Price = new Weight { Value = 0 }
-					};
-				}
-				else
-				{
-					var foundMove = actualMoves.FirstOrDefault(x => x.From == startBusStop && x.To == actualBusStops[i]);
-					pathValues[i] = new Move()
-					{
-						From = startBusStop,
-						To = actualBusStops[i],
-						Price = foundMove?.Price,
-						Time = foundMove?.Time
-					};
-
-				}
 			}
-			var visitedStops = new List<BusStop>() { startBusStop };
-			while (visitedStops.Count() != actualBusStops.Count())
-			{
-				var pathValuesToSelect = pathValues.Where(x => !visitedStops.Contains(x.To));
-				Move currentMove;
-				if (byPrice)
-					currentMove = pathValuesToSelect.MinBy(x => x.Price, _weightComparer);
-				else
-					currentMove = pathValuesToSelect.MinBy(x => x.Time, _weightComparer);
-				var currentStop = currentMove.To;
-				var possibleMoves = actualMoves.Where(x => x.From == currentStop);
-				foreach (var possibleMove in possibleMoves)
-				{
-					var actualMove = pathValues.FirstOrDefault(x => x.To == possibleMove.To);
-					if ((byPrice && actualMove.Price > (possibleMove.Price + currentMove.Price)) || (!byPrice && actualMove.Time > (possibleMove.Time + currentMove.Time)))
-					{
-						actualMove.From = possibleMove.From;
-						actualMove.Time = possibleMove.Time + currentMove.Time;
-						actualMove.Price = possibleMove.Price + currentMove.Price;
-					}
-				}
-				visitedStops.Add(currentStop);
-			}
-			//restore path
-			Move endMove;
-			if (byPrice)
-				endMove = pathValues.Where(x => x.To.StopId == endPoint).MinBy(x => x.Price, _weightComparer);
-			else
-				endMove = pathValues.Where(x => x.To.StopId == endPoint).MinBy(x=>x.Time,_weightComparer);
-			var resPath = new List<BusStop>();
-			if (endMove == null)
-				return null;
-			if (endMove.Price?.Value == null || endMove.Time?.Value == null)
+			// restore path
+			var resPath = new List<Edge>();
+			var endPoint = byPrice ?
+				pathEdges.Where(x => x.Price.Value != null && x.To == to).MinBy(x => x.Price, _weightComparer)
+				: pathEdges.Where(x => x.Time.Value != null && x.To == to).MinBy(x => x.Time, _weightComparer);
+			if (endPoint == null)
 				return null;
 			do
 			{
-				resPath.Add(endMove.To);
-				endMove = pathValues.FirstOrDefault(x => x.To == endMove.From);
-			}
-			while (endMove.From.StopId != startPoint);
-			resPath.Add(endMove.From);
-			resPath.Reverse();
-			return resPath;
+				resPath.Add(endPoint);
+				if(endPoint.From == null || endPoint.To == null || endPoint.Time.Value == null || endPoint.Price.Value == null)
+					return null;
 
+				endPoint = pathEdges.FirstOrDefault(x => x.To == endPoint.From && x.RouteTo == endPoint.RouteFrom);
+			}
+			while (endPoint.From != from);
+
+			resPath.Add(endPoint);
+			resPath.Reverse();
+			return resPath.ToArray();
+		}
+
+		private IEnumerable<Edge> GetPathInitValues(BusStop start)
+		{
+			foreach (var vertex in Vertices)
+			{
+				if (vertex.StopId == start.StopId && vertex.Route == start.Route)
+				{
+					yield return new Edge()
+					{
+						From = start.StopId,
+						To = start.StopId,
+						RouteFrom = start.Route,
+						RouteTo = start.Route,
+						Price = new Weight() { Value = 0 },
+						Time = new Weight() { Value = 0 }
+					};
+				}
+				else
+				{
+					var foundMove = Edges.FirstOrDefault(x => x.From == start.StopId && x.RouteFrom == start.Route && x.To == vertex.StopId && x.RouteTo == vertex.Route);
+
+					yield return new Edge()
+					{
+						From = start.StopId,
+						To = vertex.StopId,
+						RouteFrom = start.Route,
+						RouteTo = vertex.Route,
+						Price = new Weight() { Value = foundMove?.Price?.Value },
+						Time = new Weight() { Value = foundMove?.Time?.Value }
+					};
+				}
+			}
 		}
 	}
 }
