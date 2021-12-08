@@ -54,7 +54,7 @@
 			this.button2.Location = new System.Drawing.Point(12, 128);
 			this.button2.Name = "button2";
 			this.button2.Size = new System.Drawing.Size(104, 23);
-			this.button2.TabIndex = 0;
+			this.button2.TabIndex = 5;
 			this.button2.Text = "Найти путь";
 			this.button2.UseVisualStyleBackColor = true;
 			this.button2.Click += new System.EventHandler(this.button2_Click);
@@ -65,7 +65,7 @@
 			this.checkBox1.Location = new System.Drawing.Point(122, 132);
 			this.checkBox1.Name = "checkBox1";
 			this.checkBox1.Size = new System.Drawing.Size(71, 19);
-			this.checkBox1.TabIndex = 1;
+			this.checkBox1.TabIndex = 4;
 			this.checkBox1.Text = "По цене";
 			this.checkBox1.UseVisualStyleBackColor = true;
 			// 
@@ -74,7 +74,7 @@
 			this.tbStart.Location = new System.Drawing.Point(137, 45);
 			this.tbStart.Name = "tbStart";
 			this.tbStart.Size = new System.Drawing.Size(112, 23);
-			this.tbStart.TabIndex = 2;
+			this.tbStart.TabIndex = 1;
 			// 
 			// tbEnd
 			// 
@@ -88,7 +88,7 @@
 			this.tbTime.Location = new System.Drawing.Point(137, 103);
 			this.tbTime.Name = "tbTime";
 			this.tbTime.Size = new System.Drawing.Size(112, 23);
-			this.tbTime.TabIndex = 2;
+			this.tbTime.TabIndex = 3;
 			// 
 			// label1
 			// 
