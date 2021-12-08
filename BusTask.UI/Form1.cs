@@ -1,4 +1,5 @@
 using BusTask.GraphLogic;
+using System.Text;
 
 namespace BusTask.UI
 {
@@ -42,9 +43,29 @@ namespace BusTask.UI
 				MessageBox.Show("Путь не найден");
 			else
 			{
-				var answer = string.Join('\n', res.Select(x => $"От остановки {x.From}(Маршрут {x.RouteFrom + 1}) до остановки{x.To}(Маршрут {x.RouteTo + 1})").ToArray());
+				var answer = GeneratePathString(res);
 				MessageBox.Show(answer);
 			}
+		}
+		
+		private string GeneratePathString(Edge[] edges)
+		{
+			StringBuilder builder = new StringBuilder();
+			foreach(var edge in edges)
+			{
+				if(edge.RouteFrom != edge.RouteTo)
+				{
+					builder.AppendLine($"Пересадка на остановке {edge.From} с маршрута {edge.RouteFrom+1} на {edge.RouteTo+1}\r\n");
+				}
+				else
+				{
+					builder.AppendLine($"От {edge.From} до {edge.To} по маршруту {edge.RouteTo+1}\r\n");
+				}
+			}
+			builder.AppendLine();
+			builder.AppendLine($"Время в пути: {edges.Last().Time.Value} мин.");
+			builder.AppendLine($"Цена поездки: {edges.Last().Price.Value} руб.");
+			return builder.ToString();
 		}
 	}
 }
