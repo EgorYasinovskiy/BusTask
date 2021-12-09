@@ -82,7 +82,7 @@
 				currentEdge = byPrice ? availableEdges.MinBy(x => x.Price, _weightComparer) : availableEdges.MinBy(x => x.Time, _weightComparer);
 				if (currentEdge != null)
 				{
-					var currentTime = currentEdge.Time.Value.Value;
+					var currentTime = currentEdge.Time.Value ?? 0;
 
 					var relatedEdges = Edges.Where(x => x.From == currentEdge.To && x.RouteFrom == currentEdge.RouteTo);
 					foreach (var edge in relatedEdges)
