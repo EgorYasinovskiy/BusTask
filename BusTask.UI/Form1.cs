@@ -47,19 +47,19 @@ namespace BusTask.UI
 				MessageBox.Show(answer);
 			}
 		}
-		
+
 		private string GeneratePathString(Edge[] edges)
 		{
 			StringBuilder builder = new StringBuilder();
-			foreach(var edge in edges)
+			foreach (var edge in edges)
 			{
-				if(edge.RouteFrom != edge.RouteTo)
+				if (edge.RouteFrom != edge.RouteTo)
 				{
-					builder.AppendLine($"Пересадка на остановке {edge.From} с маршрута {edge.RouteFrom+1} на {edge.RouteTo+1}\r\n");
+					builder.AppendLine($"Пересадка на остановке {edge.From} с маршрута {edge.RouteFrom + 1} на {edge.RouteTo + 1}\r\n");
 				}
-				else
+				else if (edge.From != edge.To)
 				{
-					builder.AppendLine($"От {edge.From} до {edge.To} по маршруту {edge.RouteTo+1}\r\n");
+					builder.AppendLine($"От {edge.From} до {edge.To} по маршруту {edge.RouteTo + 1}\r\n");
 				}
 			}
 			builder.AppendLine();
